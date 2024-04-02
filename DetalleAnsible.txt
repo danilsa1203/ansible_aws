@@ -1,0 +1,58 @@
+ssh vagrant@192.168.33.11 # Para acceder desde el controller
+
+vagrant ssh debian  # Para acceder a la máquina Debian
+192.168.33.10
+vagrant ssh ubuntu # Para acceder a la máquina Ubuntu
+192.168.33.11
+vagrant ssh fedora # Para acceder a la máquina Fedora
+192.168.33.12
+
+# Playbook #
+
+---
+- name: Desplegar servicios de aplicación Rust y PostgreSQL
+  hosts: debian:ubuntu:fedora
+  become: yes
+  tasks:
+    - name: Detener y eliminar contenedor existente de aplicacion-rust
+      community.docker.docker_container:
+        name: aplicacion-rust
+        state: absent
+        ignore_errors: yes
+
+    - name: Detener y eliminar contenedor existente de dan (PostgreSQL)
+      docker_container:
+        name: dan
+        state: absent
+        ignore_errors: yes
+
+    - name: Construir la imagen Docker de aplicacion-rust
+      docker_image:
+        name: danilsa/aplicacion-rust
+        build:
+          path: /ruta/a/tu/aplicacion-rust
+          dockerfile: Dockerfile
+          args:
+            DATABASE_URL: "postgres://postgres:postgres@dan:5432/postgres"
+
+    - name: Ejecutar contenedor Docker de dan (PostgreSQL)
+      docker_container:
+        name: dan
+        image: postgres:12
+        state: started
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - "5432:5432"
+
+    - name: Ejecutar contenedor Docker de aplicacion-rust
+      docker_container:
+        name: aplicacion-rust
+        image: danilsa/aplicacion-rust:1.0.0
+        state: started
+        ports:
+          - "6001:6001"
+        depends_on:
+          - dan
